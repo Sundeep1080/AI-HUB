@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#1B3A5C"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><title>AI Hub: describe a job, get the plan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#EDF0F2;--sf:#fff;--ink:#16212B;--mute:#566675;--line:#CBD3DA;--btn:#1B3A5C;--btnt:#fff;--hl:#FFD84D;--ok:#0B6E4F;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10171D;--sf:#18222B;--ink:#E8EEF2;--mute:#9AABB8;--line:#2B3946;--btn:#FFD84D;--btnt:#16212B;--hl:#FFD84D;--ok:#58D6A6}}
+:root[data-theme="dark"]{--bg:#10171D;--sf:#18222B;--ink:#E8EEF2;--mute:#9AABB8;--line:#2B3946;--btn:#FFD84D;--btnt:#16212B;--hl:#FFD84D;--ok:#58D6A6}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Bricolage Grotesque",system-ui,sans-serif}
+.w{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:1.9rem;line-height:1.1;margin:8px 0 4px;font-weight:800}
+.sub{color:var(--mute);margin:0 0 16px}
+nav{display:flex;gap:2px;overflow-x:auto;margin-bottom:14px;border-bottom:2px solid var(--line)}
+nav button{white-space:nowrap;background:none;border:0;color:var(--mute);font:inherit;font-weight:600;padding:10px 12px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+nav button[aria-selected=true]{color:var(--ink);border-color:var(--hl)}
+textarea,input,select{width:100%;font:inherit;color:var(--ink);background:var(--sf);border:1.5px solid var(--line);border-radius:8px;padding:10px}
+textarea{min-height:110px;resize:vertical}
+:focus-visible{outline:3px solid var(--hl);outline-offset:2px}
+.btn{background:var(--btn);color:var(--btnt);border:0;border-radius:8px;padding:11px 16px;font:inherit;font-weight:600;cursor:pointer}
+.btn.g{background:none;color:var(--ink);border:1.5px solid var(--line);padding:7px 11px;font-size:.88rem}
+.btn:disabled{opacity:.5}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.chip{border:1.5px solid var(--line);background:var(--sf);color:var(--ink);border-radius:99px;padding:5px 11px;font:inherit;font-size:.85rem;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--hl);color:#16212B;border-color:var(--hl)}
+.card{background:var(--sf);border:1.5px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+.q label{font-weight:600;display:block;margin-top:10px}.q small{color:var(--mute);display:block;margin-bottom:4px}
+.step{border-left:6px solid var(--btn);padding-left:12px}
+.step.done{border-left-color:var(--ok);opacity:.7}
+.step h3{margin:0 0 4px;font-size:1.05rem}
+.tag{display:inline-block;background:var(--hl);color:#16212B;border-radius:4px;padding:1px 7px;font-size:.78rem;font-weight:600;margin-right:6px}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font:.88rem/1.45 ui-monospace,monospace;margin:8px 0}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.muted{color:var(--mute);font-size:.9rem}
+.err{color:#C2362B;font-weight:600}
+.cat{margin:16px 0 4px;font-size:1.05rem;font-weight:800}
+.tool{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.tool a{color:var(--ink);font-weight:600}
+.hid{display:none}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>AI Hub</h1>
+<p class="sub">Tell me the job in your own words. I’ll work out what you really need, pick the tools and write the prompts.</p>
+<nav role="tablist">
+<button role="tab" aria-selected="true" data-t="plan">Plan a job</button>
+<button role="tab" aria-selected="false" data-t="cat">Tool catalog</button>
+<button role="tab" aria-selected="false" data-t="jobs">Saved jobs</button>
+<button role="tab" aria-selected="false" data-t="svc">Services</button>
+<button role="tab" aria-selected="false" data-t="new">What’s new</button>
+</nav>
+
+<section id="plan">
+<label for="req" class="muted">What does the client want? Rough is fine.</label>
+<textarea id="req" placeholder="e.g. Turn this product description into a 30-second video ad for Instagram…"></textarea>
+<div class="chips" id="ex"></div>
+<button class="btn" id="go">Understand my need</button>
+<div id="out"></div>
+</section>
+
+<section id="cat" class="hid">
+<input id="find" type="search" placeholder="Search tools or categories">
+<div id="list"></div>
+<div class="card">
+<strong>Add your own tool</strong>
+<div class="row"><input id="an" placeholder="Name" style="flex:1 1 140px"><select id="ac" style="flex:1 1 140px"></select></div>
+<div class="row"><input id="au" placeholder="Website, e.g. example.com" style="flex:1 1 140px"><input id="ano" placeholder="What it does" style="flex:2 1 200px"></div>
+<div class="row"><button class="btn" id="add">Add tool</button></div>
+</div>
+</section>
+
+<section id="jobs" class="hid"></section>
+<section id="svc" class="hid"><div id="sv"></div></section>
+<section id="new" class="hid"><div class="card"><strong>Find new AI tools</strong><div class="muted">Searches the web for tools launched in the last 30 days. Uses your OpenRouter key.</div><div class="row"><button class="btn" id="fn">Find new tools</button></div></div><div id="fr"></div><div id="log"></div></section>
+</div>
+
+<script>
+const CAT={
+"Websites & apps":["Lovable|lovable.dev|Describe an app, get a working site","Bolt.new|bolt.new|Full-stack apps from a prompt","v0|v0.dev|UI components and pages","Replit|replit.com|Build and host apps with an agent","Framer|framer.com|Designer-grade marketing sites","Google AI Studio|aistudio.google.com|Prototype with Gemini, free tier","Stitch|stitch.withgoogle.com|Google’s UI design generator","Antigravity|antigravity.google|Google’s agentic coding tool"],
+"Design & slides":["Canva|canva.com|Social posts, brochures, brand kits","Figma|figma.com|Professional UI and brand design","Gamma|gamma.app|Decks and docs from a prompt","Beautiful.ai|beautiful.ai|Smart-layout presentations","Pitch|pitch.com|Team pitch decks","Piktochart|piktochart.com|Infographics and reports","Napkin|napkin.ai|Turn text into diagrams","Pomelli||Google Labs brand-aligned marketing visuals"],
+"Images & photo":["Midjourney|midjourney.com|Best-looking artistic images","Ideogram|ideogram.ai|Images with accurate text","Adobe Firefly|firefly.adobe.com|Commercially safer images","Leonardo|leonardo.ai|Image models with fine control","Gemini (Nano Banana)|gemini.google.com|Edit and generate images in chat","Photoroom|photoroom.com|Product photos, background removal","Aftershoot|aftershoot.com|Auto-cull and edit photo shoots","Imagen AI|imagen-ai.com|Batch photo editing in your style","Topaz Photo AI|topazlabs.com|Upscale and restore photos","Renderstuff||Render and visualise designs"],
+"Video & avatars":["Runway|runwayml.com|Generative video and editing","Veo / Flow||Google video generation","Kling|klingai.com|Strong realistic video clips","Pika|pika.art|Quick stylised video","Luma|lumalabs.ai|Dream Machine video","HeyGen|heygen.com|Talking avatars and dubbing","Synthesia|synthesia.io|Corporate avatar videos","Opus Clip|opus.pro|Long video into short clips","CapCut|capcut.com|Fast editing with AI captions","Descript|descript.com|Edit video by editing text"],
+"Voice & audio":["ElevenLabs|elevenlabs.io|Best voices, dubbing, voice agents","Suno|suno.com|Songs from a prompt","Udio|udio.com|Music generation","Murf|murf.ai|Studio voiceovers","Wispr Flow|wisprflow.ai|Dictate anywhere; weekly free word limit","Blabby||Voice-dictation Chrome extension, freemium"],
+"Writing & chat":["Claude|claude.ai|Long writing, analysis, files","ChatGPT|chatgpt.com|General assistant, images, voice","Gemini|gemini.google.com|Google ecosystem assistant","Jasper|jasper.ai|Marketing copy with brand voice","Copy.ai|copy.ai|Sales and marketing copy workflows","Grammarly|grammarly.com|Editing and tone","Notion AI|notion.com|Notes and docs with AI"],
+"Research":["Perplexity|perplexity.ai|Cited web answers","NotebookLM|notebooklm.google.com|Chat over your own documents","Elicit|elicit.com|Academic paper search","Consensus|consensus.app|Evidence from studies"],
+"Data & Excel":["Claude in Excel|claude.ai|Formulas and cleanup inside Excel","Copilot in Excel||Microsoft’s Excel assistant","Gemini in Sheets||Google Sheets assistant","Julius|julius.ai|Chat with data, charts","Hex|hex.tech|Data notebooks with AI"],
+"Sales & leads":["Apollo|apollo.io|Lead database and outreach","SignalHire|signalhire.com|Find contact details","Clay|clay.com|Enrich leads, build outreach lists","Instantly|instantly.ai|Cold email at scale","Lemlist|lemlist.com|Personalised outreach","Smartlead|smartlead.ai|Email sending and warm-up","Hunter|hunter.io|Find and verify emails"],
+"AI callers & chat agents":["Vapi|vapi.ai|Build voice agents for calls","Retell AI|retellai.com|Phone agents","Bland AI|bland.ai|Outbound calling agents","Synthflow|synthflow.ai|No-code voice agents","ElevenLabs Agents|elevenlabs.io|Conversational voice agents","Intercom Fin|intercom.com|Customer support agent","Tidio|tidio.com|Website chat bots","Wapi||WhatsApp messaging automation"],
+"Social & marketing":["Blotato|blotato.com|Create and schedule social content","Buffer|buffer.com|Scheduling","Metricool|metricool.com|Social analytics and scheduling","Typefully|typefully.com|X and LinkedIn writing"],
+"Meetings":["Fireflies|fireflies.ai|Record, transcribe, summarise","Otter|otter.ai|Live transcription","Fathom|fathom.video|Free meeting notes","Read AI|read.ai|Meeting summaries and analytics","Granola|granola.ai|Notes without a bot"],
+"Automation & agents":["n8n|n8n.io|Self-hostable workflow automation","Zapier|zapier.com|Easiest app connections","Make|make.com|Visual workflows","Pipedream|pipedream.com|Code-friendly automation","Lindy|lindy.ai|No-code AI assistants","Gumloop|gumloop.com|AI workflow builder"],
+"Projects & CRM":["Asana|asana.com|Task management","ClickUp|clickup.com|All-in-one work management","Notion|notion.com|Docs and databases","HubSpot|hubspot.com|CRM and marketing","monday.com|monday.com|Work boards"],
+"Accounts & inventory":["QuickBooks|quickbooks.intuit.com|Bookkeeping","Xero|xero.com|Online accounting","Zoho Books|zoho.com/books|Accounting for small firms","Dext|dext.com|Receipt capture","Docyt|docyt.com|Automated bookkeeping","Odoo|odoo.com|ERP and inventory","inFlow|inflowinventory.com|Inventory"],
+"Sell & build blocks":["Gumroad|gumroad.com|Sell digital products","Razorpay|razorpay.com|Payment links and checkout for India","Shopify|shopify.com|Online store with checkout","Stripe|stripe.com|Payments and invoices","OpenRouter|openrouter.ai|One API for many AI models","Hugging Face|huggingface.co|Open models","Replicate|replicate.com|Run models by API","fal|fal.ai|Fast image and video model API","123apps|123apps.com|Free online audio, video, PDF tools","iLovePDF|ilovepdf.com|PDF tools"]
+};
+const EX=["Turn this product description into a 30-second Instagram video ad","Be a sales rep for our product line: calls, objections, closing","Project report and a 10-slide deck on our new factory plan","Plan and run a wedding photo shoot, then deliver edited photos"];
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ls={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+let custom=ls.get("hub_custom",[]),log=ls.get("hub_log",[]),S,state={};
+const built=()=>Object.entries(CAT).flatMap(([c,a])=>a.map(t=>{const[n,u,d]=t.split("|");return{c,n,u,d}}));
+const all=()=>built().concat(custom);
+const link=n=>{const t=all().find(x=>x.n.toLowerCase()===String(n).toLowerCase());return t&&t.u?"https://"+t.u:"https://www.google.com/search?q="+encodeURIComponent(n+" AI tool")};
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));["plan","cat","jobs","svc","new"].forEach(i=>$("#"+i).classList.toggle("hid",i!==b.dataset.t))});
+$("#ex").innerHTML=EX.map((e,i)=>`<button class="chip" data-i="${i}">${esc(e)}</button>`).join("");
+$("#ex").onclick=e=>{const i=e.target.dataset.i;if(i!=null)$("#req").value=EX[i]};
+$("#ac").innerHTML=Object.keys(CAT).map(c=>`<option>${esc(c)}</option>`).join("");
+function renderCat(){const q=$("#find").value.toLowerCase(),g={};all().forEach(t=>{if(!q||(t.n+t.d+t.c).toLowerCase().includes(q))(g[t.c]=g[t.c]||[]).push(t)});
+$("#list").innerHTML=Object.entries(g).map(([c,a])=>`<div class="cat">${esc(c)}</div>`+a.map(t=>`<div class="tool"><a href="${esc(link(t.n))}" target="_blank" rel="noopener">${t.u?`<img src="https://www.google.com/s2/favicons?domain=${esc(t.u.split("/")[0])}&sz=64" width="20" height="20" alt="" style="vertical-align:-4px;margin-right:6px">`:""}${esc(t.n)}</a><span class="muted">${esc(t.d)}</span></div>`).join("")).join("")||'<p class="muted">No match. Add it below.</p>'}
+$("#find").oninput=renderCat;renderCat();
+$("#add").onclick=()=>{const n=$("#an").value.trim();if(!n)return;custom.push({c:$("#ac").value,n,u:$("#au").value.trim().replace(/^https?:\/\//,""),d:$("#ano").value.trim()});log.unshift({d:new Date().toDateString(),t:"Added "+n+" to "+$("#ac").value});ls.set("hub_custom",custom);ls.set("hub_log",log);["#an","#au","#ano"].forEach(s=>$(s).value="");renderCat();renderLog()};
+function renderLog(){const base=[{d:"21 Nov 2026",t:"Catalog rebuilt with 16 categories. Lists are from my own knowledge, not re-checked online. Ask Claude in chat to refresh the catalog and it will search and update this page."}];
+$("#log").innerHTML=log.concat(base).map(l=>`<div class="card"><strong>${esc(l.d)}</strong><br>${esc(l.t)}</div>`).join("")}
+renderLog();
+
+const catText=()=>Object.entries(CAT).map(([c,a])=>c+": "+a.map(t=>t.split("|")[0]).join(", ")).join("\n")+(custom.length?"\nYour added tools: "+custom.map(t=>t.n+" ("+t.c+")").join(", "):"");
+function busy(b,on,t){b.disabled=on;if(t)b.textContent=t}
+$("#go").onclick=async function(){const r=$("#req").value.trim();if(!r)return;state={req:r};busy(this,true,"Thinking…");$("#out").innerHTML="";
+try{const a=await ask(`You are the planning brain of a one-person AI agency. A client who may not know how to describe their need wrote: """${r}"""
+Work out what they really want. Return ONLY JSON: {"understood":"2 plain sentences","type":"direct|generator|agent|automation","questions":[{"q":"","why":"one short line","suggest":"a sensible default answer"}]}
+Ask 3 to 5 questions that most change the result (audience, goal, format, tone, budget, deadline, assets they already have). type: direct = Claude can write it in chat (reports, slide content, scripts, plans); generator = an outside image, video or design tool; agent = live voice or chat agent; automation = chained workflow.`);
+state.a=a;$("#out").innerHTML=`<div class="card"><span class="tag">${esc(a.type)}</span>${esc(a.understood)}<div class="q">${a.questions.map((q,i)=>`<label for="q${i}">${esc(q.q)}</label><small>${esc(q.why)}</small><input id="q${i}" value="${esc(q.suggest)}">`).join("")}</div><div class="row"><button class="btn" id="mk">Build my plan</button></div></div>`;$("#mk").onclick=build}
+catch(e){$("#out").innerHTML=`<p class="err">${esc(e.message||"Something went wrong. Try again.")}</p>`}busy(this,false,"Understand my need")};
+async function build(){const b=$("#mk");busy(b,true,"Planning…");const A=state.a.questions.map((q,i)=>q.q+" => "+$("#q"+i).value).join("\n");
+try{const p=await ask(`You are the planning brain of a one-person AI agency. Need: """${state.req}"""
+Clarifications:\n${A}
+Tool catalog (use these names exactly):\n${catText()}
+Return ONLY JSON: {"summary":"one line","diagnosis":{"problem":"what is going wrong, in plain words","confidence":"low|medium|high","root_causes":[{"cause":"","evidence":"what in the client answers points to it","check":"how to confirm it"}],"missing_info":"what we still need to see"},"steps":[{"fixes":"which root cause this step addresses","tool":"","job":"what this tool does in this step","prompt":"complete ready-to-paste prompt, self-contained, specific, written in the tool’s own style","you_provide":"files or inputs the user must have","check":"how to judge the result before moving on"}],"final_check":"quality check before delivering to the client","risks":"privacy, rights or cost issues","prompt_basis":["10 short names of the strongest prompt approaches used"],"master_prompt":"the master prompt, see rules","scorecard":["criterion"],"run_in":[{"ai":"","why":""}]}
+Rules: first diagnose. Separate symptoms from root causes (ask why repeatedly), rank 2 to 4 likely causes, say honestly that this is a hypothesis until the client confirms it, and make every step fix a named root cause. 3 to 7 steps in execution order. Use catalog tools. Use the tool name "Claude" for writing, planning and analysis steps. If no catalog tool fits, name the best tool anyway. Plain language for a non-expert. master_prompt: first list in prompt_basis the 10 strongest, most proven prompt approaches for this exact category of work (the techniques top practitioners use). Then combine the best element of each into ONE industry-grade prompt that does the WHOLE job at professional quality. It must never invent facts, must say what it is unsure of, and must include a self-check before its final answer. Structure it as: a role line; STEP 0 information gathering that forbids any output until the key facts are supplied; numbered steps; a scoring step (1 to 10) using the scorecard; the exact output format; a tone line; placeholders like [ADD DETAIL] where facts are missing. scorecard: 6 to 10 specific criteria for judging the finished work. run_in: 2 or 3 AI tools (Claude, ChatGPT, Gemini or others) with one line on why each suits this job.`);
+state.p=p;state.d={};draw()}catch(e){$("#out").insertAdjacentHTML("beforeend",`<p class="err">${esc(e.message||"Could not build the plan. Try again.")}</p>`);busy(b,false,"Build my plan")}}
+function draw(){const p=state.p,n=Object.values(state.d).filter(Boolean).length;
+$("#out").innerHTML=`<div class="card"><strong>${esc(p.summary)}</strong><div class="muted">${n} of ${p.steps.length} steps done</div></div>`+diag()+p.steps.map((s,i)=>`<div class="card step ${state.d[i]?"done":""}"><h3>Step ${i+1}: ${esc(s.tool)}</h3><div>${esc(s.job)}</div>${s.fixes?`<div class="muted">Fixes: ${esc(s.fixes)}</div>`:""}<pre id="p${i}">${esc(s.prompt)}</pre><div class="muted"><span class="tag">You provide</span>${esc(s.you_provide)}</div><div class="muted" style="margin-top:4px"><span class="tag">Check</span>${esc(s.check)}</div><div class="row"><button class="btn g" data-c="${i}">Copy prompt</button>${/^claude/i.test(s.tool)?`<button class="btn g" data-r="${i}">Let Claude do this step</button>`:`<a class="btn g" style="text-decoration:none" href="${esc(link(s.tool))}" target="_blank" rel="noopener">Open ${esc(s.tool)}</a>`}<button class="btn g" data-d="${i}">${state.d[i]?"Undo done":"Mark done"}</button></div><div id="r${i}"></div></div>`).join("")+master()+`<div class="card"><label class="muted" for="cl">Client or job name</label><input id="cl" value="${esc(state.client||"")}"><div class="row"><button class="btn" data-s="1">Save job</button></div></div><div class="card"><strong>Before it reaches the client</strong><p>${esc(p.final_check)}</p><p class="muted">${esc(p.risks)}</p></div>`}
+$("#out").onclick=async e=>{const t=e.target,d=t.dataset;if(d.c!=null){const x=state.p.steps[d.c].prompt;try{await navigator.clipboard.writeText(x);t.textContent="Copied"}catch{const r=document.createRange();r.selectNodeContents($("#p"+d.c));getSelection().removeAllRanges();getSelection().addRange(r);t.textContent="Selected, press copy"}}
+if(d.m!=null){try{await navigator.clipboard.writeText(state.p.master_prompt);t.textContent="Copied"}catch{t.textContent="Select the text and copy"}}if(d.k!=null){await critique(t)}if(d.d!=null){if($("#cl"))state.client=$("#cl").value;state.d[d.d]=!state.d[d.d];persist();draw()}if(d.s!=null){state.client=$("#cl").value.trim()||"Untitled job";state.id=state.id||Date.now();persist();t.textContent="Saved"}
+if(d.r!=null){t.disabled=true;t.textContent="Working…";try{const res=await (await sm())(state.p.steps[d.r].prompt,{cache:false});$("#r"+d.r).innerHTML=`<pre>${esc(res.text)}</pre>`;t.textContent="Done"}catch(er){t.disabled=false;t.textContent="Let Claude do this step";$("#r"+d.r).innerHTML=`<p class="err">${esc(er.message||"Try again.")}</p>`}}};
+const MODEL="anthropic/claude-sonnet-4.5";
+async function orq(model,p){let k=ls.get("hub_key","");if(!k){k=prompt("Paste your OpenRouter API key. It is stored only on this device:")||"";ls.set("hub_key",k)}
+const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+k},body:JSON.stringify({model,messages:[{role:"user",content:p}]})});
+const j=await r.json();if(!r.ok){if(r.status==401)ls.set("hub_key","");throw{message:(j.error&&j.error.message)||"Request failed"}}return j.choices[0].message.content}
+const clean=t=>t.replace(/```json|```/g,"").trim();
+async function sm(){if(!S){S=async p=>({text:await orq(MODEL,p)});S.json=async p=>JSON.parse(clean(await orq(MODEL,p)))}return S}
+async function ask(p){return (await sm()).json(p)}
+let jobs=ls.get("hub_jobs",[]);
+function persist(){if(!state.id)return;const j={id:state.id,client:state.client,req:state.req,a:state.a,p:state.p,d:state.d,ts:new Date().toDateString()},i=jobs.findIndex(x=>x.id===j.id);i<0?jobs.unshift(j):jobs[i]=j;ls.set("hub_jobs",jobs);renderJobs()}
+function renderJobs(){$("#jobs").innerHTML=jobs.length?jobs.map(j=>`<div class="card"><strong>${esc(j.client)}</strong><div class="muted">${esc(String(j.req).slice(0,110))}<br>${Object.values(j.d||{}).filter(Boolean).length} of ${j.p.steps.length} steps done, saved ${esc(j.ts)}</div><div class="row"><button class="btn g" data-o="${j.id}">Open</button><button class="btn g" data-x="${j.id}">Delete</button></div></div>`).join(""):'<p class="muted">No saved jobs yet. Build a plan, name it and tap Save job.</p>'}
+const show=t=>document.querySelector(`nav button[data-t=${t}]`).click();
+$("#jobs").onclick=e=>{const d=e.target.dataset;if(d.o){const j=jobs.find(x=>String(x.id)===d.o);if(j){state={req:j.req,a:j.a,p:j.p,d:j.d||{},id:j.id,client:j.client};$("#req").value=j.req;draw();show("plan")}}if(d.x){jobs=jobs.filter(x=>String(x.id)!==d.x);ls.set("hub_jobs",jobs);renderJobs()}};
+renderJobs();
+const SV=[
+{n:"Voice sales agent",d:"The whole sales cycle: opening call, qualifying, pitch, objections, closing, follow-up.",b:"Build a voice sales agent for our product line that handles the full cycle: opening call, qualifying questions, pitch, objections, pricing, closing and follow-up. It must say it is an AI, hand over to a human when needed, and run on a voice-agent platform."},
+{n:"Text to image or video ad",d:"Turn a rough description into a finished image or short video.",b:"Turn my product description into a 30-second vertical video ad for Instagram, with a script, key images, voiceover and captions."},
+{n:"Project report and deck",d:"A written report plus a slide deck from your notes.",b:"Write a project report and a 10-slide presentation from my notes. Audience: senior management. I will review before sending."},
+{n:"Wedding photo shoot",d:"Shot list, schedule, mood board and photo editing.",b:"Plan a wedding photo shoot: mood board, shot list by moment, day schedule, and how to cull and edit hundreds of photos fast."},
+{n:"Full LinkedIn redesign",d:"Audit, positioning, headline, About, experience, skills, banner, photo and a 30-day plan.",b:"Completely redesign my entire LinkedIn profile: recruiter-style audit, positioning, headline, About, experience bullets, skills, banner, photo brief and a 30-day action list."},
+{n:"Jewellery catalogue with online buying",d:"A print-ready catalogue plus a shop page with buy buttons.",b:"Create a jewellery catalogue for my collection as a print-ready PDF, plus an online shop page where customers can pay by payment link or order on WhatsApp, with product descriptions, photo direction and stock tracking."}];
+$("#sv").innerHTML=SV.map((s,i)=>`<div class="card"><strong>${esc(s.n)}</strong><div class="muted">${esc(s.d)}</div>${i?"":'<label class="muted" for="pl">Paste your product line: products, prices, who buys them</label><textarea id="pl"></textarea><div class="row"><button class="btn" id="pb">Write the sales playbook</button></div><pre id="po" class="hid"></pre><div class="row"><button class="btn g hid" id="pc">Copy playbook</button></div>'}<div class="row"><button class="btn g" data-u="${i}">Use this template in the planner</button></div></div>`).join("");
+$("#sv").onclick=async e=>{const t=e.target;if(t.dataset.u!=null){$("#req").value=SV[t.dataset.u].b;show("plan")}
+if(t.id==="pc"){try{await navigator.clipboard.writeText($("#po").textContent);t.textContent="Copied"}catch{}}
+if(t.id==="pb"){const x=$("#pl").value.trim();if(!x)return;t.disabled=true;t.textContent="Writing…";const o=$("#po");o.classList.remove("hid");o.textContent="Working…";
+try{const r=await(await sm())(`You are a senior sales trainer. Product line:\n"""${x}"""\nWrite a sales playbook for an AI voice agent with these parts: 1) product cheat-sheet and who each product suits; 2) qualifying questions; 3) opening call script that says it is an AI assistant; 4) pitch for each customer type; 5) the 12 most likely objections with replies; 6) pricing and plan logic, marking any discount limits the owner must confirm; 7) closing lines and next steps; 8) follow-up messages; 9) when to hand over to a human; 10) rules: no false claims, honour do-not-call and consent, say when the call is recorded. Use short, spoken-style sentences.`,{cache:false});o.textContent=r.text;$("#pc").classList.remove("hid")}catch(er){o.textContent=er.message||"Try again."}t.disabled=false;t.textContent="Write the sales playbook"}};
+function master(){const p=state.p;if(!p.master_prompt)return"";return `<div class="card"><strong>Master prompt</strong><div class="muted">Paste this into the AI you choose. It will ask for your details before it starts.</div><pre id="mp">${esc(p.master_prompt)}</pre><div class="row"><button class="btn g" data-m="1">Copy master prompt</button></div><div class="muted" style="margin-top:8px"><span class="tag">Built from</span>${(p.prompt_basis||[]).map(esc).join(", ")}</div><div class="muted" style="margin-top:8px"><span class="tag">Run it in</span>${(p.run_in||[]).map(r=>esc(r.ai)+": "+esc(r.why)).join(" / ")}<br>Tip: run it in two AIs and compare the results below.</div></div><div class="card"><strong>Check the result</strong><div class="muted">Paste what the AI gave you. It is scored against: ${esc((p.scorecard||[]).join(", "))}.</div><textarea id="cr" placeholder="Paste the AI’s output here"></textarea><div class="row"><button class="btn" data-k="1">Critique against the scorecard</button></div><div id="co"></div></div>`}
+async function critique(t){const x=$("#cr").value.trim();if(!x)return;t.disabled=true;t.textContent="Scoring…";const o=$("#co");try{const r=await(await sm())(`You are a strict senior reviewer. The client need: """${state.req}"""\nScorecard criteria: ${(state.p.scorecard||[]).join("; ")}\nAn AI produced this work:\n"""${x}"""\nScore each criterion 1 to 10 with one or two specific reasons. Then list the 3 highest-impact fixes, anything factual or legal that must be verified before it reaches the client, and a short follow-up prompt to send back to the AI to close the gaps. Be direct and specific. Do not flatter.`,{cache:false});o.innerHTML=`<pre>${esc(r.text)}</pre>`}catch(er){o.innerHTML=`<p class="err">${esc(er.message||"Try again.")}</p>`}t.disabled=false;t.textContent="Critique against the scorecard"}
+function diag(){const g=state.p.diagnosis;if(!g)return"";return `<div class="card"><strong>What’s going wrong</strong><div>${esc(g.problem)}</div><div class="muted">Confidence: ${esc(g.confidence)}. Treat this as a hypothesis until the client confirms it.</div>${(g.root_causes||[]).map((c,i)=>`<div style="margin-top:8px"><span class="tag">Cause ${i+1}</span><strong>${esc(c.cause)}</strong><div class="muted">Why we think so: ${esc(c.evidence)}<br>How to confirm: ${esc(c.check)}</div></div>`).join("")}${g.missing_info?`<div class="muted" style="margin-top:8px"><span class="tag">Still needed</span>${esc(g.missing_info)}</div>`:""}</div>`}
+
+$("#fn").onclick=async()=>{const b=$("#fn");b.disabled=true;b.textContent="Searching…";try{const t=await orq(MODEL+":online",'Search the web for AI tools launched or trending in the last 30 days that help a one-person agency (video, design, sales, automation, voice agents, writing, data). Return ONLY a JSON array of up to 10 objects {"name":"","domain":"","category":"","note":""}. Only include tools found in search results.');const a=JSON.parse(clean(t));window._f=a;$("#fr").innerHTML=a.map((x,i)=>`<div class="card"><strong>${esc(x.name)}</strong> <span class="muted">${esc(x.category)}</span><br>${esc(x.note)}<div class="row"><button class="btn g" data-a="${i}">Add to catalog</button></div></div>`).join("")}catch(e){$("#fr").innerHTML=`<p class="err">${esc(e.message||"Could not fetch.")}</p>`}b.disabled=false;b.textContent="Find new tools"};
+$("#fr").onclick=e=>{const i=e.target.dataset.a;if(i==null)return;const x=window._f[i];custom.push({c:Object.keys(CAT).includes(x.category)?x.category:"Automation & agents",n:x.name,u:String(x.domain||"").replace(/^https?:\/\//,""),d:x.note});log.unshift({d:new Date().toDateString(),t:"Added "+x.name});ls.set("hub_custom",custom);ls.set("hub_log",log);renderCat();renderLog();e.target.textContent="Added"};
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
